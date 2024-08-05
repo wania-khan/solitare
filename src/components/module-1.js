@@ -49,11 +49,11 @@ function Module1() {
                                 <div className="absolute top-0 left-0 w-[68px] h-[200px]">
                                     {[...Array(4)].map((_, index) => (
                                         <div key={index} className="absolute w-full h-[100px]" style={{ top: `${index * 30}px`, zIndex: index }}>
-                                            <img src={Back} alt="Card Back" className={`w-full h-full object-cover rounded-lg ${index === 0 ? 'border-4 border-[#00ace6]' : ''}`} />
+                                            <img src={Back} alt="error_back" className={`w-full h-full object-cover rounded-lg ${index === 0 ? 'border-4 border-[#00ace6]' : ''}`} />
                                         </div>
                                     ))}
                                     <div className="absolute w-full h-[100px]" style={{ top: '120px', zIndex: 4 }}>
-                                        <img src={randomCard()} alt="Random Card" className="w-full h-full object-cover rounded-lg" />
+                                        <img src={randomCard()} alt="error_front" className="w-full h-full object-cover rounded-lg" />
                                     </div>
                                 </div>
                             </div>
