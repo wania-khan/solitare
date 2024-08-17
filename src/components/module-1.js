@@ -42,6 +42,7 @@ const Card = ({ card, index, stackIndex, onDragStart }) => (
         className="w-[68px] h-[100px] object-cover"
         draggable={card.name !== "Back"}
         onDragStart={(e) => onDragStart(e, { stackIndex, cardIndex: index })}
+        onError={(e) => e.target.src = Back} // Fallback to Back if image fails to load
     />
 );
 
@@ -85,12 +86,16 @@ const Module1 = () => {
     const [completedFoundations, setCompletedFoundations] = useState([]);
     const [gameOver, setGameOver] = useState(false);
     const [history, setHistory] = useState([]); // Track history for undo functionality
+    const [showRules, setShowRules] = useState(true); // Show rules initially
+    const [difficulty, setDifficulty] = useState(null); // Selected difficulty level
 
     useEffect(() => {
-        initializeGame();
-    }, []);
+        if (difficulty) {
+            initializeGame(difficulty);
+        }
+    }, [difficulty]);
 
-    const initializeGame = () => {
+    const initializeGame = (selectedDifficulty) => {
         const newDeck = generateDeck();
         const initialStacks = Array(10)
             .fill(null)
@@ -105,6 +110,9 @@ const Module1 = () => {
                 return stack;
             });
 
+        const foundationSlots = selectedDifficulty === "Easy" ? 1 :
+            selectedDifficulty === "Medium" ? 2 : 3;
+
         // Prepare deal deck with 50 cards
         const newDealDeck = newDeck.slice(0, 50);
         setDealDeck(newDealDeck);
@@ -114,9 +122,10 @@ const Module1 = () => {
         setMoves(0);
         setDeals(5);
         setFoundations(0);
-        setCompletedFoundations([]);
+        setCompletedFoundations(Array(foundationSlots).fill(null)); // Initialize the correct number of foundations
         setGameOver(false);
         setHistory([]); // Reset history for undo
+        setShowRules(false); // Hide rules after initializing
     };
 
     const saveHistory = () => {
@@ -174,11 +183,15 @@ const Module1 = () => {
                     newStacks[toStackIndex].length - 13
                 );
                 setFoundations(foundations + 1);
-                setCompletedFoundations([...completedFoundations, King]); // Use the King card
+                setCompletedFoundations(prev => {
+                    const updated = [...prev];
+                    updated[foundations] = King; // Use the King card for foundation
+                    return updated;
+                });
                 setCardStacks(newStacks);
 
                 // Check if the game is over
-                if (foundations + 1 >= 1) { // 1 or more suits completed
+                if (foundations + 1 >= completedFoundations.length) { // Based on the selected difficulty
                     setGameOver(true);
                 }
             }
@@ -220,88 +233,135 @@ const Module1 = () => {
 
     return (
         <>
-            <div className="m-auto flex">
-                <div className="flex flex-col justify-center mt-3">
-                    <div className="relative mb-2">
-                        <img
-                            alt="deal"
-                            className={`cursor-pointer w-[68px] h-24 m-0 border-4 border-white rounded-lg transform transition-transform duration-300 ${deals > 0 ? "hover:scale-95" : "opacity-50 cursor-not-allowed"}`}
-                            src={Back}
-                            onClick={deals > 0 ? dealCards : null}
-                        />
-                    </div>
-                    <div className="inline">
-                        <h3 className="text-blue-400 font-bold">
-                            Moves:<span className="text-red-700" id="moves">&nbsp;{moves}</span>
-                        </h3>
-                    </div>
-                    <div className="inline mt-3">
-                        <h3 className="text-blue-400 font-bold">
-                            Deals Left:<span className="text-red-700" id="deals">&nbsp;{deals}</span>
-                        </h3>
-                    </div>
-                    <button
-                        className={`mt-2 py-3 px-4 border-[1px] w-[70px] rounded-md border-blue-200 text-red-800 ${deals > 0 ? "" : "opacity-50 cursor-not-allowed"}`}
-                        onClick={deals > 0 ? dealCards : null}
-                    >
-                        Deal
-                    </button>
-                    <button className="mt-2 py-[10px] px-3 w-[74px] rounded-md bg-blue-600 text-white font-semibold" onClick={initializeGame}>
-                        Reset
-                    </button>
-                    <button className="mt-2 py-[10px] px-3 w-[74px] rounded-md bg-blue-600 text-white font-semibold" onClick={undoMove}>
-                        Undo
-                    </button>
-                    <div className="bg-white w-20 h-[100px] rounded-lg mt-4 relative">
-                        {completedFoundations.map((card, index) => (
-                            <img
-                                key={index}
-                                src={card}
-                                alt={`foundation-${index}`}
-                                className="w-20 h-[98px] object-cover"
-                            />
-                        ))}
-                        <p className="absolute text-xs text-gray-800 mt-10 ml-[6px]">Foundation</p>
-                    </div>
-                    <div className="inline">
-                        <h3 className="text-blue-400 font-semibold text-xs mt-3">
-                            Foundation Filled:<span id="filled">&nbsp;{foundations}</span>
-                        </h3>
+            {showRules ? (
+                <div className="absolute top-0 left-0 right-0 bottom-0 flex flex-col justify-center items-center bg-black bg-opacity-70 z-50 p-4">
+                    <div className="relative p-4 max-h-screen w-[400px] bg-black overflow-y-auto">
+                        <h2 className="text-2xl font-bold mb-4">Spider Solitaire Rules</h2>
+                        <ul className="text-[#38bdf8] mb-4">
+                            <li><strong>Objective:</strong> Arrange all cards of each suit in descending order from King to Ace to clear them from the tableau.</li>
+                            <li><strong>Setup:</strong> Two decks of cards are dealt into 10 columns. Each column contains a mix of face-up and face-down cards.</li>
+                            <li><strong>Foundation:</strong> Empty foundation piles at the left side. Complete descending sequences from King to Ace are moved to these piles.</li>
+                            <li><strong>Gameplay:</strong>
+                                <ul className="ml-4 list-disc">
+                                    <li>Move cards within the tableau to create descending sequences of cards of the same suit.</li>
+                                    <li>Sequences can be moved as a unit if they are of the same suit.</li>
+                                    <li>Any card or sequence can be moved to an empty column.</li>
+                                    <li>Deal new cards from the stock pile to the tableau when stuck.</li>
+                                </ul>
+                            </li>
+                            <li><strong>Winning:</strong> Fill all foundation piles with cards of the same suit, arranged from King to Ace.</li>
+                        </ul>
+                        <div className="flex justify-end">
+                            <button className="bg-blue-500 text-white py-2 px-4 rounded-lg mt-4" onClick={() => setShowRules(false)}>
+                                Close
+                            </button>
+                        </div>
                     </div>
                 </div>
-                <div className="flex ml-[30px]">
-                    <div className="relative mt-3 flex space-x-4">
-                        {cardStacks.map((stack, index) => (
-                            <CardStack
-                                key={index}
-                                stack={stack}
-                                stackIndex={index}
-                                onDragStart={handleDragStart}
-                                onDragOver={handleDragOver}
-                                onDrop={handleDrop}
-                            />
-                        ))}
+            ) : difficulty === null ? (
+                <div className="absolute top-0 left-0 right-0 bottom-0 bg-black bg-opacity-80 z-50 p-4">
+                    <div className="absolute top-[200px] left-[500px] right-0 bottom-0 bg-black h-[260px] w-[280px] rounded-lg flex flex-col justify-center items-center">
+                        <h2 className="text-2xl text-white font-bold mb-4">Select Difficulty</h2>
+                        <button className="bg-blue-700 text-white py-2 px-4 rounded-lg mb-2" onClick={() => setDifficulty("Easy")}>
+                            Easy
+                        </button>
+                        <button className="bg-green-600 text-white py-2 px-4 rounded-lg mb-2" onClick={() => setDifficulty("Medium")}>
+                            Medium
+                        </button>
+                        <button className="bg-red-600 text-white py-2 px-4 rounded-lg mb-2" onClick={() => setDifficulty("Hard")}>
+                            Hard
+                        </button>
                     </div>
                 </div>
-            </div>
-            <div className="flex mb-2 justify-between items-end -mt-36">
-                <div></div>
-                <div className="flex flex-col justify-center items-center bg-black w-[130px] h-[140px] border-4 border-[#337084] rounded-lg mx-2">
-                    <h1 className="text-white text-lg" id="timer"></h1>
-                    <button className="text-orange-700 italic text-lg mt-1">Pause</button>
-                </div>
-                <div className="w-[170px] h-[240px] bg-black rounded-lg mr-3">
-                    <img src={Favicon} alt="error_favicon" className="w-full h-full object-contain" />
-                </div>
-            </div>
-            {gameOver && (
-                <div className="absolute top-0 left-0 right-0 bottom-0 flex flex-col justify-center items-center bg-white bg-opacity-75 z-50">
-                    <img src={Congrats} alt="Congrats" className="w-[780px] h-[300px]" />
-                    <div className="flex flex-col -mt-6">
-                        <h2 className="text-4xl font-bold text-black">You Won!</h2>
-                        <p className="text-lg text-black mt-4 font-bold">Total Moves: <span className="text-lg text-red-700">&nbsp;{moves}</span></p>
+            ) : (
+                <>
+                    <div className="m-auto flex">
+                        <div className="ml-20 flex flex-col justify-center mt-3">
+                            <div className="relative mb-2">
+                                <img
+                                    alt="deal"
+                                    className={`cursor-pointer w-[68px] h-24 m-0 border-4 border-white rounded-lg transform transition-transform duration-300 ${deals > 0 ? "hover:scale-95" : "opacity-50 cursor-not-allowed"}`}
+                                    src={Back}
+                                    onClick={deals > 0 ? dealCards : null}
+                                />
+                            </div>
+                            <div className="inline">
+                                <h3 className="text-blue-400 font-bold">
+                                    Moves:<span className="text-red-700" id="moves">&nbsp;{moves}</span>
+                                </h3>
+                            </div>
+                            <div className="inline mt-3">
+                                <h3 className="text-blue-400 font-bold">
+                                    Deals Left:<span className="text-red-700" id="deals">&nbsp;{deals}</span>
+                                </h3>
+                            </div>
+                            <button
+                                className={`mt-2 py-3 px-4 border-[1px] w-[70px] rounded-md border-blue-200 text-red-800 ${deals > 0 ? "" : "opacity-50 cursor-not-allowed"}`}
+                                onClick={deals > 0 ? dealCards : null}
+                            >
+                                Deal
+                            </button>
+                            <button className="mt-2 py-[10px] px-3 w-[74px] rounded-md bg-blue-600 text-white font-semibold" onClick={() => initializeGame(difficulty)}>
+                                Reset
+                            </button>
+                            <button className="mt-2 py-[10px] px-3 w-[74px] rounded-md bg-blue-600 text-white font-semibold" onClick={undoMove}>
+                                Undo
+                            </button>
+                            <div className="flex mt-4 space-x-4">
+                                {completedFoundations.map((card, index) => (
+                                    <div key={index} className="bg-white w-20 h-[100px] rounded-lg relative">
+                                        {card && (
+                                            <img
+                                                src={card}
+                                                alt={`foundation-${index}`}
+                                                className="w-20 h-[98px] object-cover"
+                                            />
+                                        )}
+                                        <p className="absolute text-xs text-gray-800 mt-10 ml-[6px]">Foundation</p>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="inline">
+                                <h3 className="text-blue-400 font-semibold text-xs mt-3">
+                                    Foundation Filled:<span id="filled">&nbsp;{foundations}</span>
+                                </h3>
+                            </div>
+                        </div>
+                        <div className="flex ml-[30px]">
+                            <div className="relative mt-3 flex space-x-4">
+                                {cardStacks.map((stack, index) => (
+                                    <CardStack
+                                        key={index}
+                                        stack={stack}
+                                        stackIndex={index}
+                                        onDragStart={handleDragStart}
+                                        onDragOver={handleDragOver}
+                                        onDrop={handleDrop}
+                                    />
+                                ))}
+                            </div>
+                        </div>
                     </div>
-                </div>
+                    <div className="flex mb-2 justify-between items-end -mt-36">
+                        <div></div>
+                        <div className="flex flex-col justify-center items-center bg-black w-[130px] h-[140px] border-4 border-[#337084] rounded-lg mx-2">
+                            <h1 className="text-white text-lg" id="timer"></h1>
+                            <button className="text-orange-700 italic text-lg mt-1">Pause</button>
+                        </div>
+                        <div className="w-[170px] h-[240px] bg-black rounded-lg mr-3">
+                            <img src={Favicon} alt="error_favicon" className="w-full h-full object-contain" />
+                        </div>
+                    </div>
+                    {gameOver && (
+                        <div className="absolute top-0 left-0 right-0 bottom-0 flex flex-col justify-center items-center bg-white bg-opacity-75 z-50">
+                            <img src={Congrats} alt="Congrats" className="w-[780px] h-[300px]" />
+                            <div className="flex flex-col -mt-6">
+                                <h2 className="text-4xl font-bold text-black">You Won!</h2>
+                                <p className="text-lg text-black mt-4 font-bold">Total Moves: <span className="text-lg text-red-700">&nbsp;{moves}</span></p>
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </>
     );
