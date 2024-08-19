@@ -133,7 +133,20 @@ const Module1 = () => {
     };
 
     const handleDragStart = (e, { stackIndex, cardIndex }) => {
-        setDraggedCard({ stackIndex, cardIndex });
+        const selectedStack = cardStacks[stackIndex];
+        const selectedCards = selectedStack.slice(cardIndex);
+
+        // Check if the sequence is in the correct order
+        const isValidSequence = selectedCards.every((card, index) => {
+            if (index === 0) return true; // Skip the first card
+            return card.value === selectedCards[index - 1].value - 1;
+        });
+
+        if (isValidSequence) {
+            setDraggedCard({ stackIndex, cardIndex });
+        } else {
+            e.preventDefault(); // Prevent drag if the sequence is not valid
+        }
     };
 
     const handleDragOver = (e) => {
@@ -171,10 +184,6 @@ const Module1 = () => {
                 newStacks[fromStackIndex][newStacks[fromStackIndex].length - 1] = card;
             }
 
-            setCardStacks(newStacks);
-            setMoves(moves + 1);
-            setDraggedCard(null);
-
             // Check if a suit is completed
             const completedSuit = checkForCompletedSuit(newStacks[toStackIndex]);
             if (completedSuit) {
@@ -185,16 +194,32 @@ const Module1 = () => {
                 setFoundations(foundations + 1);
                 setCompletedFoundations(prev => {
                     const updated = [...prev];
-                    updated[foundations] = King; // Use the King card for foundation
+                    updated[foundations] = Ace; // Use the Ace card for foundation
                     return updated;
                 });
+
+                // Reveal the next card in the stack if any after completing the suit
+                if (newStacks[toStackIndex].length && newStacks[toStackIndex][newStacks[toStackIndex].length - 1].name === "Back") {
+                    const card = deck.pop();
+                    setCardsRemaining((prev) => ({
+                        ...prev,
+                        [card.name]: prev[card.name] - 1,
+                    }));
+                    newStacks[toStackIndex][newStacks[toStackIndex].length - 1] = card;
+                }
+
                 setCardStacks(newStacks);
 
                 // Check if the game is over
                 if (foundations + 1 >= completedFoundations.length) { // Based on the selected difficulty
                     setGameOver(true);
                 }
+            } else {
+                setCardStacks(newStacks);
             }
+
+            setMoves(moves + 1);  // Increment the move counter here
+            setDraggedCard(null);
         }
     };
 
@@ -229,6 +254,12 @@ const Module1 = () => {
             setMoves(lastState.moves);
             setHistory(history); // Update history without the last state
         }
+    };
+
+    const handlePlayAgain = () => {
+        setGameOver(false);
+        setShowRules(true);
+        setDifficulty(null); // Reset difficulty to prompt the difficulty selection screen again
     };
 
     return (
@@ -358,6 +389,12 @@ const Module1 = () => {
                             <div className="flex flex-col -mt-6">
                                 <h2 className="text-4xl font-bold text-black">You Won!</h2>
                                 <p className="text-lg text-black mt-4 font-bold">Total Moves: <span className="text-lg text-red-700">&nbsp;{moves}</span></p>
+                                <button 
+                                    className="mt-4 py-2 px-6 bg-blue-600 text-white text-xl rounded-lg" 
+                                    onClick={handlePlayAgain}
+                                >
+                                    Play Again
+                                </button>
                             </div>
                         </div>
                     )}
