@@ -28,7 +28,7 @@ const cardValues = {
 const generateDeck = () => {
     const deck = [];
     for (const name of Object.keys(cardImages)) {
-        for (let i = 0; i < 8; i++) { // 8 copies of each card (for four decks of one suit)
+        for (let i = 0; i < 8; i++) { 
             deck.push({ name, value: cardValues[name] });
         }
     }
@@ -42,7 +42,7 @@ const Card = ({ card, index, stackIndex, onDragStart }) => (
         className="w-[68px] h-[100px] object-cover"
         draggable={card.name !== "Back"}
         onDragStart={(e) => onDragStart(e, { stackIndex, cardIndex: index })}
-        onError={(e) => e.target.src = Back} // Fallback to Back if image fails to load
+        onError={(e) => e.target.src = Back}
     />
 );
 
@@ -79,21 +79,35 @@ const Module1 = () => {
     const [dealDeck, setDealDeck] = useState([]);
     const [cardsRemaining, setCardsRemaining] = useState(
         Object.keys(cardImages).reduce((acc, name) => {
-            acc[name] = 8; // 8 copies of each card initially (for four decks)
+            acc[name] = 8;
             return acc;
         }, {})
     );
     const [completedFoundations, setCompletedFoundations] = useState([]);
     const [gameOver, setGameOver] = useState(false);
-    const [history, setHistory] = useState([]); // Track history for undo functionality
-    const [showRules, setShowRules] = useState(true); // Show rules initially
-    const [difficulty, setDifficulty] = useState(null); // Selected difficulty level
+    const [history, setHistory] = useState([]);
+    const [showRules, setShowRules] = useState(true);
+    const [difficulty, setDifficulty] = useState(null);
+    const [timer, setTimer] = useState(15 * 60); // 15 minutes in seconds
+    const [isPaused, setIsPaused] = useState(false);
 
     useEffect(() => {
         if (difficulty) {
             initializeGame(difficulty);
         }
     }, [difficulty]);
+
+    useEffect(() => {
+        if (timer === 0) setGameOver(true);
+    }, [timer]);
+
+    useEffect(() => {
+        let interval;
+        if (!isPaused && !gameOver && timer > 0) {
+            interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isPaused, gameOver]);
 
     const initializeGame = (selectedDifficulty) => {
         const newDeck = generateDeck();
@@ -110,47 +124,41 @@ const Module1 = () => {
                 return stack;
             });
 
-        const foundationSlots = selectedDifficulty === "Easy" ? 1 :
-            selectedDifficulty === "Medium" ? 2 : 3;
+        const foundationSlots = selectedDifficulty === "Easy" ? 1 : selectedDifficulty === "Medium" ? 2 : 3;
 
-        // Prepare deal deck with 50 cards
         const newDealDeck = newDeck.slice(0, 50);
         setDealDeck(newDealDeck);
-        setDeck(newDeck.slice(50)); // Remove 50 cards from the main deck
+        setDeck(newDeck.slice(50));
 
         setCardStacks(initialStacks);
         setMoves(0);
         setDeals(5);
         setFoundations(0);
-        setCompletedFoundations(Array(foundationSlots).fill(null)); // Initialize the correct number of foundations
+        setCompletedFoundations(Array(foundationSlots).fill(null));
         setGameOver(false);
-        setHistory([]); // Reset history for undo
-        setShowRules(false); // Hide rules after initializing
+        setHistory([]);
+        setTimer(15 * 60); // Reset the timer
+        setIsPaused(false);
+        setShowRules(false);
     };
 
     const saveHistory = () => {
-        setHistory(prev => [...prev, { cardStacks, moves }]);
+        setHistory(prev => [...prev, { cardStacks, moves, deals, dealDeck, completedFoundations, foundations }]);
     };
 
     const handleDragStart = (e, { stackIndex, cardIndex }) => {
         const selectedStack = cardStacks[stackIndex];
         const selectedCards = selectedStack.slice(cardIndex);
-
-        // Check if the sequence is in the correct order
         const isValidSequence = selectedCards.every((card, index) => {
-            if (index === 0) return true; // Skip the first card
+            if (index === 0) return true;
             return card.value === selectedCards[index - 1].value - 1;
         });
 
         if (isValidSequence) {
             setDraggedCard({ stackIndex, cardIndex });
         } else {
-            e.preventDefault(); // Prevent drag if the sequence is not valid
+            e.preventDefault();
         }
-    };
-
-    const handleDragOver = (e) => {
-        e.preventDefault();
     };
 
     const handleDrop = (e, toStackIndex) => {
@@ -159,23 +167,14 @@ const Module1 = () => {
         const fromCardIndex = draggedCard.cardIndex;
         const draggedCards = cardStacks[fromStackIndex].slice(fromCardIndex);
         const toStack = cardStacks[toStackIndex];
-
-        // Check if the move is valid for a single card or a stack of cards
-        if (
-            toStack.length === 0 || // Allow move if the target stack is empty
-            toStack[toStack.length - 1].name === "Back" ||
-            (draggedCards[0].value === toStack[toStack.length - 1].value - 1)
-        ) {
-            saveHistory(); // Save the current state before making a move
+    
+        if (toStack.length === 0 || toStack[toStack.length - 1].name === "Back" || draggedCards[0].value === toStack[toStack.length - 1].value - 1) {
+            saveHistory();
             const newStacks = [...cardStacks];
             newStacks[fromStackIndex] = cardStacks[fromStackIndex].slice(0, fromCardIndex);
             newStacks[toStackIndex] = [...toStack, ...draggedCards];
-
-            // Reveal the card beneath if it exists
-            if (
-                newStacks[fromStackIndex].length &&
-                newStacks[fromStackIndex][newStacks[fromStackIndex].length - 1].name === "Back"
-            ) {
+    
+            if (newStacks[fromStackIndex].length && newStacks[fromStackIndex][newStacks[fromStackIndex].length - 1].name === "Back") {
                 const card = deck.pop();
                 setCardsRemaining((prev) => ({
                     ...prev,
@@ -183,49 +182,33 @@ const Module1 = () => {
                 }));
                 newStacks[fromStackIndex][newStacks[fromStackIndex].length - 1] = card;
             }
-
-            // Check if a suit is completed
+    
             const completedSuit = checkForCompletedSuit(newStacks[toStackIndex]);
             if (completedSuit) {
-                newStacks[toStackIndex] = newStacks[toStackIndex].slice(
-                    0,
-                    newStacks[toStackIndex].length - 13
-                );
-                setFoundations(foundations + 1);
+                newStacks[toStackIndex] = newStacks[toStackIndex].slice(0, newStacks[toStackIndex].length - 13);
+                setFoundations(prev => prev + 1);
                 setCompletedFoundations(prev => {
                     const updated = [...prev];
-                    updated[foundations] = Ace; // Use the Ace card for foundation
+                    updated[foundations] = Ace;
                     return updated;
                 });
-
-                // Reveal the next card in the stack if any after completing the suit
-                if (newStacks[toStackIndex].length && newStacks[toStackIndex][newStacks[toStackIndex].length - 1].name === "Back") {
-                    const card = deck.pop();
-                    setCardsRemaining((prev) => ({
-                        ...prev,
-                        [card.name]: prev[card.name] - 1,
-                    }));
-                    newStacks[toStackIndex][newStacks[toStackIndex].length - 1] = card;
-                }
-
-                setCardStacks(newStacks);
-
-                // Check if the game is over
-                if (foundations + 1 >= completedFoundations.length) { // Based on the selected difficulty
+    
+                // Update to check for game completion
+                const totalFoundationsNeeded = difficulty === "Easy" ? 1 : difficulty === "Medium" ? 2 : 3;
+                if (foundations + 1 >= totalFoundationsNeeded) {
                     setGameOver(true);
                 }
-            } else {
-                setCardStacks(newStacks);
             }
-
-            setMoves(moves + 1);  // Increment the move counter here
+    
+            setCardStacks(newStacks);
+            setMoves(prev => prev + 1);
             setDraggedCard(null);
         }
-    };
+    };    
 
     const dealCards = () => {
         if (deals > 0 && dealDeck.length >= 10) {
-            saveHistory(); // Save the current state before dealing new cards
+            saveHistory();
             const newStacks = [...cardStacks];
             newStacks.forEach((stack) => {
                 const card = dealDeck.pop();
@@ -236,8 +219,8 @@ const Module1 = () => {
                 stack.push(card);
             });
             setCardStacks(newStacks);
-            setDealDeck([...dealDeck]); // Update the dealDeck with remaining cards
-            setDeals(deals - 1);
+            setDealDeck([...dealDeck]);
+            setDeals(prev => prev - 1);
         }
     };
 
@@ -249,17 +232,31 @@ const Module1 = () => {
 
     const undoMove = () => {
         if (history.length > 0) {
-            const lastState = history.pop(); // Get the last state from history
+            const lastState = history.pop();
             setCardStacks(lastState.cardStacks);
             setMoves(lastState.moves);
-            setHistory(history); // Update history without the last state
+            setDeals(lastState.deals);
+            setDealDeck(lastState.dealDeck);
+            setCompletedFoundations(lastState.completedFoundations);
+            setFoundations(lastState.foundations);
+            setHistory(history);
         }
     };
 
     const handlePlayAgain = () => {
         setGameOver(false);
         setShowRules(true);
-        setDifficulty(null); // Reset difficulty to prompt the difficulty selection screen again
+        setDifficulty(null);
+    };
+
+    const handlePauseResume = () => {
+        setIsPaused(prev => !prev);
+    };
+
+    const formatTime = (time) => {
+        const minutes = String(Math.floor(time / 60)).padStart(2, '0');
+        const seconds = String(time % 60).padStart(2, '0');
+        return `${minutes}:${seconds}`;
     };
 
     return (
@@ -366,7 +363,7 @@ const Module1 = () => {
                                         stack={stack}
                                         stackIndex={index}
                                         onDragStart={handleDragStart}
-                                        onDragOver={handleDragOver}
+                                        onDragOver={(e) => e.preventDefault()}
                                         onDrop={handleDrop}
                                     />
                                 ))}
@@ -376,8 +373,8 @@ const Module1 = () => {
                     <div className="flex mb-2 justify-between items-end -mt-36">
                         <div></div>
                         <div className="flex flex-col justify-center items-center bg-black w-[130px] h-[140px] border-4 border-[#337084] rounded-lg mx-2">
-                            <h1 className="text-white text-lg" id="timer"></h1>
-                            <button className="text-orange-700 italic text-lg mt-1">Pause</button>
+                            <h1 className="text-white text-lg" id="timer">{formatTime(timer)}</h1>
+                            <button className="text-orange-700 italic text-lg mt-1" onClick={handlePauseResume}>{isPaused ? "Resume" : "Pause"}</button>
                         </div>
                         <div className="w-[170px] h-[240px] bg-black rounded-lg mr-3">
                             <img src={Favicon} alt="error_favicon" className="w-full h-full object-contain" />
@@ -396,6 +393,17 @@ const Module1 = () => {
                                     Play Again
                                 </button>
                             </div>
+                        </div>
+                    )}
+                    {isPaused && (
+                        <div className="absolute top-0 left-0 right-0 bottom-0 flex flex-col justify-center items-center bg-black bg-opacity-80 z-50">
+                            <h1 className="text-white text-4xl font-bold">Game Paused</h1>
+                            <button 
+                                className="mt-8 py-2 px-6 text-orange-700 italic text-xl rounded-lg" 
+                                onClick={handlePauseResume}
+                            >
+                                Resume
+                            </button>
                         </div>
                     )}
                 </>
