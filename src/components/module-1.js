@@ -15,15 +15,13 @@ import Queen from '../assets/images/queen.png';
 import Jack from '../assets/images/jack.png';
 import Favicon from '../assets/images/favicon.png';
 import Congrats from '../assets/images/congrats.png';
+import Cards from '../assets/images/cards.png';
 
 const cardImages = {
-    Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, King, Queen, Jack
-};
+    Ace, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten, King, Queen, Jack};
 
 const cardValues = {
-    Ace: 1, Two: 2, Three: 3, Four: 4, Five: 5, Six: 6, Seven: 7, Eight: 8, Nine: 9, Ten: 10,
-    Jack: 11, Queen: 12, King: 13
-};
+    Ace: 1, Two: 2, Three: 3, Four: 4, Five: 5, Six: 6, Seven: 7, Eight: 8, Nine: 9, Ten: 10, Jack: 11, Queen: 12, King: 13};
 
 const generateDeck = () => {
     const deck = [];
@@ -32,38 +30,29 @@ const generateDeck = () => {
             deck.push({ name, value: cardValues[name] });
         }
     }
-    return deck.sort(() => Math.random() - 0.5);
-};
+    return deck.sort(() => Math.random() - 0.5);};
 
 const Card = ({ card, index, stackIndex, onDragStart }) => (
-    <img
-        src={card.name === "Back" ? Back : cardImages[card.name]}
+    <img src={card.name === "Back" ? Back : cardImages[card.name]}
         alt={card.name}
         className="w-[68px] h-[100px] object-cover"
         draggable={card.name !== "Back"}
         onDragStart={(e) => onDragStart(e, { stackIndex, cardIndex: index })}
-        onError={(e) => e.target.src = Back}
-    />
+        onError={(e) => e.target.src = Back}/>
 );
 
 const CardStack = ({ stack, stackIndex, onDrop, onDragOver, onDragStart }) => (
     <div
         className="relative w-[74px] h-[108px] border-4 border-[#337084] rounded-lg"
         onDragOver={onDragOver}
-        onDrop={(e) => onDrop(e, stackIndex)}
-    >
+        onDrop={(e) => onDrop(e, stackIndex)}>
         {stack.map((card, index) => (
-            <div
-                key={index}
-                className="absolute"
-                style={{ top: `${index * 20}px`, zIndex: index }}
-            >
+            <div key={index} className="absolute" style={{ top: `${index * 20}px`, zIndex: index }}>
                 <Card
                     card={card}
                     index={index}
                     stackIndex={stackIndex}
-                    onDragStart={onDragStart}
-                />
+                    onDragStart={onDragStart}/>
             </div>
         ))}
     </div>
@@ -85,6 +74,7 @@ const Module1 = () => {
     );
     const [completedFoundations, setCompletedFoundations] = useState([]);
     const [gameOver, setGameOver] = useState(false);
+    const [timeUp, setTimeUp] = useState(false);
     const [history, setHistory] = useState([]);
     const [showRules, setShowRules] = useState(true);
     const [difficulty, setDifficulty] = useState(null);
@@ -98,7 +88,10 @@ const Module1 = () => {
     }, [difficulty]);
 
     useEffect(() => {
-        if (timer === 0) setGameOver(true);
+        if (timer === 0) {
+            setTimeUp(true);
+            setGameOver(true);
+        }
     }, [timer]);
 
     useEffect(() => {
@@ -129,13 +122,13 @@ const Module1 = () => {
         const newDealDeck = newDeck.slice(0, 50);
         setDealDeck(newDealDeck);
         setDeck(newDeck.slice(50));
-
         setCardStacks(initialStacks);
         setMoves(0);
         setDeals(5);
         setFoundations(0);
         setCompletedFoundations(Array(foundationSlots).fill(null));
         setGameOver(false);
+        setTimeUp(false);
         setHistory([]);
         setTimer(15 * 60); // Reset the timer
         setIsPaused(false);
@@ -158,8 +151,7 @@ const Module1 = () => {
             setDraggedCard({ stackIndex, cardIndex });
         } else {
             e.preventDefault();
-        }
-    };
+        }};
 
     const handleDrop = (e, toStackIndex) => {
         e.preventDefault();
@@ -174,15 +166,6 @@ const Module1 = () => {
             newStacks[fromStackIndex] = cardStacks[fromStackIndex].slice(0, fromCardIndex);
             newStacks[toStackIndex] = [...toStack, ...draggedCards];
     
-            if (newStacks[fromStackIndex].length && newStacks[fromStackIndex][newStacks[fromStackIndex].length - 1].name === "Back") {
-                const card = deck.pop();
-                setCardsRemaining((prev) => ({
-                    ...prev,
-                    [card.name]: prev[card.name] - 1,
-                }));
-                newStacks[fromStackIndex][newStacks[fromStackIndex].length - 1] = card;
-            }
-    
             const completedSuit = checkForCompletedSuit(newStacks[toStackIndex]);
             if (completedSuit) {
                 newStacks[toStackIndex] = newStacks[toStackIndex].slice(0, newStacks[toStackIndex].length - 13);
@@ -193,18 +176,37 @@ const Module1 = () => {
                     return updated;
                 });
     
-                // Update to check for game completion
+                // Ensure to reveal the last card after removing a completed suit
+                if (newStacks[toStackIndex].length && newStacks[toStackIndex][newStacks[toStackIndex].length - 1].name === "Back") {
+                    const card = deck.pop();
+                    setCardsRemaining((prev) => ({
+                        ...prev,
+                        [card.name]: prev[card.name] - 1,
+                    }));
+                    newStacks[toStackIndex][newStacks[toStackIndex].length - 1] = card;
+                }
+
+                // Check if the game is won based on the difficulty level
                 const totalFoundationsNeeded = difficulty === "Easy" ? 1 : difficulty === "Medium" ? 2 : 3;
                 if (foundations + 1 >= totalFoundationsNeeded) {
                     setGameOver(true);
                 }
             }
     
+            // Ensure the last card of the stack where the suit was removed from is revealed
+            if (newStacks[fromStackIndex].length && newStacks[fromStackIndex][newStacks[fromStackIndex].length - 1].name === "Back") {
+                const card = deck.pop();
+                setCardsRemaining((prev) => ({
+                    ...prev,
+                    [card.name]: prev[card.name] - 1,
+                }));
+                newStacks[fromStackIndex][newStacks[fromStackIndex].length - 1] = card;
+            }
+    
             setCardStacks(newStacks);
             setMoves(prev => prev + 1);
             setDraggedCard(null);
-        }
-    };    
+        }};        
 
     const dealCards = () => {
         if (deals > 0 && dealDeck.length >= 10) {
@@ -221,8 +223,7 @@ const Module1 = () => {
             setCardStacks(newStacks);
             setDealDeck([...dealDeck]);
             setDeals(prev => prev - 1);
-        }
-    };
+        }};
 
     const checkForCompletedSuit = (stack) => {
         if (stack.length < 13) return false;
@@ -240,24 +241,20 @@ const Module1 = () => {
             setCompletedFoundations(lastState.completedFoundations);
             setFoundations(lastState.foundations);
             setHistory(history);
-        }
-    };
+        }};
 
     const handlePlayAgain = () => {
         setGameOver(false);
         setShowRules(true);
-        setDifficulty(null);
-    };
+        setDifficulty(null);};
 
     const handlePauseResume = () => {
-        setIsPaused(prev => !prev);
-    };
+        setIsPaused(prev => !prev);};
 
     const formatTime = (time) => {
         const minutes = String(Math.floor(time / 60)).padStart(2, '0');
         const seconds = String(time % 60).padStart(2, '0');
-        return `${minutes}:${seconds}`;
-    };
+        return `${minutes}:${seconds}`;};
 
     return (
         <>
@@ -281,8 +278,7 @@ const Module1 = () => {
                         </ul>
                         <div className="flex justify-end">
                             <button className="bg-blue-500 text-white py-2 px-4 rounded-lg mt-4" onClick={() => setShowRules(false)}>
-                                Close
-                            </button>
+                                Close</button>
                         </div>
                     </div>
                 </div>
@@ -291,14 +287,11 @@ const Module1 = () => {
                     <div className="absolute top-[200px] left-[500px] right-0 bottom-0 bg-black h-[260px] w-[280px] rounded-lg flex flex-col justify-center items-center">
                         <h2 className="text-2xl text-white font-bold mb-4">Select Difficulty</h2>
                         <button className="bg-blue-700 text-white py-2 px-4 rounded-lg mb-2" onClick={() => setDifficulty("Easy")}>
-                            Easy
-                        </button>
+                            Easy</button>
                         <button className="bg-green-600 text-white py-2 px-4 rounded-lg mb-2" onClick={() => setDifficulty("Medium")}>
-                            Medium
-                        </button>
+                            Medium</button>
                         <button className="bg-red-600 text-white py-2 px-4 rounded-lg mb-2" onClick={() => setDifficulty("Hard")}>
-                            Hard
-                        </button>
+                            Hard</button>
                     </div>
                 </div>
             ) : (
@@ -306,12 +299,10 @@ const Module1 = () => {
                     <div className="m-auto flex">
                         <div className="ml-20 flex flex-col justify-center mt-3">
                             <div className="relative mb-2">
-                                <img
-                                    alt="deal"
+                                <img alt="deal"
                                     className={`cursor-pointer w-[68px] h-24 m-0 border-4 border-white rounded-lg transform transition-transform duration-300 ${deals > 0 ? "hover:scale-95" : "opacity-50 cursor-not-allowed"}`}
                                     src={Back}
-                                    onClick={deals > 0 ? dealCards : null}
-                                />
+                                    onClick={deals > 0 ? dealCards : null}/>
                             </div>
                             <div className="inline">
                                 <h3 className="text-blue-400 font-bold">
@@ -325,25 +316,16 @@ const Module1 = () => {
                             </div>
                             <button
                                 className={`mt-2 py-3 px-4 border-[1px] w-[70px] rounded-md border-blue-200 text-red-800 ${deals > 0 ? "" : "opacity-50 cursor-not-allowed"}`}
-                                onClick={deals > 0 ? dealCards : null}
-                            >
-                                Deal
-                            </button>
+                                onClick={deals > 0 ? dealCards : null}>Deal</button>
                             <button className="mt-2 py-[10px] px-3 w-[74px] rounded-md bg-blue-600 text-white font-semibold" onClick={() => initializeGame(difficulty)}>
-                                Reset
-                            </button>
+                                Reset</button>
                             <button className="mt-2 py-[10px] px-3 w-[74px] rounded-md bg-blue-600 text-white font-semibold" onClick={undoMove}>
-                                Undo
-                            </button>
+                                Undo</button>
                             <div className="flex mt-4 space-x-4">
                                 {completedFoundations.map((card, index) => (
                                     <div key={index} className="bg-white w-20 h-[100px] rounded-lg relative">
                                         {card && (
-                                            <img
-                                                src={card}
-                                                alt={`foundation-${index}`}
-                                                className="w-20 h-[98px] object-cover"
-                                            />
+                                            <img src={card} alt={`foundation-${index}`} className="w-20 h-[98px] object-cover"/>
                                         )}
                                         <p className="absolute text-xs text-gray-800 mt-10 ml-[6px]">Foundation</p>
                                     </div>
@@ -364,8 +346,7 @@ const Module1 = () => {
                                         stackIndex={index}
                                         onDragStart={handleDragStart}
                                         onDragOver={(e) => e.preventDefault()}
-                                        onDrop={handleDrop}
-                                    />
+                                        onDrop={handleDrop}/>
                                 ))}
                             </div>
                         </div>
@@ -380,7 +361,19 @@ const Module1 = () => {
                             <img src={Favicon} alt="error_favicon" className="w-full h-full object-contain" />
                         </div>
                     </div>
-                    {gameOver && (
+                    {gameOver && timeUp && (
+                        <div className="absolute top-0 left-0 right-0 bottom-0 flex flex-col justify-center items-center bg-white bg-opacity-75 z-50">
+                            <img src={Cards} alt="Game Over" className="w-[380px] h-[300px]" />
+                            <div className="flex flex-col -mt-6">
+                                <h2 className="text-4xl font-bold text-black">Game Over!</h2>
+                                <p className="text-lg text-black mt-4 font-bold">Oops. Time's up! Try again?</p>
+                                <button 
+                                    className="mt-4 py-2 px-6 bg-blue-600 text-white text-xl rounded-lg" 
+                                    onClick={handlePlayAgain}>Play Again</button>
+                            </div>
+                        </div>
+                    )}
+                    {gameOver && !timeUp && (
                         <div className="absolute top-0 left-0 right-0 bottom-0 flex flex-col justify-center items-center bg-white bg-opacity-75 z-50">
                             <img src={Congrats} alt="Congrats" className="w-[780px] h-[300px]" />
                             <div className="flex flex-col -mt-6">
@@ -388,10 +381,7 @@ const Module1 = () => {
                                 <p className="text-lg text-black mt-4 font-bold">Total Moves: <span className="text-lg text-red-700">&nbsp;{moves}</span></p>
                                 <button 
                                     className="mt-4 py-2 px-6 bg-blue-600 text-white text-xl rounded-lg" 
-                                    onClick={handlePlayAgain}
-                                >
-                                    Play Again
-                                </button>
+                                    onClick={handlePlayAgain}>Play Again</button>
                             </div>
                         </div>
                     )}
@@ -400,10 +390,7 @@ const Module1 = () => {
                             <h1 className="text-white text-4xl font-bold">Game Paused</h1>
                             <button 
                                 className="mt-8 py-2 px-6 text-orange-700 italic text-xl rounded-lg" 
-                                onClick={handlePauseResume}
-                            >
-                                Resume
-                            </button>
+                                onClick={handlePauseResume}>Resume</button>
                         </div>
                     )}
                 </>
