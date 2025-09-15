@@ -1,3 +1,7 @@
+# About the App
+
+This project is a simple solitaire game with three modes for user difficulty level: Easy, Medium, Hard
+
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
